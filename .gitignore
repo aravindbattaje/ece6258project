@@ -1,0 +1,13 @@
+# Python byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# DLLs
+*.dll
+
+# VSCode
+.vscode/*
+
+# Video data
+captures/*
