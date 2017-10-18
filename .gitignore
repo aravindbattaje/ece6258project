@@ -11,3 +11,6 @@ __pycache__/
 
 # Video data
 captures/*
+
+# Temporary data
+new_*.pickle
