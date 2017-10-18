@@ -7,7 +7,7 @@ import os
 cur_seek_pos = 0
 seek_callback_action = False
 controls_window_name = 'Controls'
-
+play_or_pause = 'Pause'
 
 def dummy_callback(value):
     pass
@@ -20,6 +20,13 @@ def seek_callback(value):
     seek_callback_action = True
 
 
+def playpause_callback(value):
+    global play_or_pause
+    if value == 0:
+        play_or_pause = 'Pause'
+    else:
+        play_or_pause = 'Play'
+
 def setup_trackbars(window_name):
     window = cv2.namedWindow(window_name, 0)
 
@@ -30,7 +37,8 @@ def setup_trackbars(window_name):
     cv2.createTrackbar('V_MIN', window_name, 0, 255, dummy_callback)
     cv2.createTrackbar('V_MAX', window_name, 255, 255, dummy_callback)
 
-    cv2.createTrackbar('Playback', window_name, 0, 100, seek_callback)
+    cv2.createTrackbar('Seek', window_name, 0, 100, seek_callback)
+    cv2.createTrackbar('Playback', window_name, 0, 1, playpause_callback)
 
 
 def get_thresholds(window_name):
@@ -74,14 +82,18 @@ def main():
     video = Video(args['video'])
     num_frames = video.get_num_frames()
 
+    # Get the first frame to start with
+    frame = video.next_frame()
+    
     global seek_callback_action
 
     while True:
-        if not seek_callback_action:
-            frame = video.next_frame()
-        else:
-            frame = video.get_frame(cur_seek_pos * num_frames / 100)
-            seek_callback_action = False
+        if play_or_pause == 'Play':
+            if not seek_callback_action:
+                frame = video.next_frame()
+            else:
+                frame = video.get_frame(cur_seek_pos * num_frames / 100)
+                seek_callback_action = False
 
         if video.end_reached():
             # Wait indefinitely if end of video reached
