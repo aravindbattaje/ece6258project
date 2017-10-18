@@ -3,6 +3,7 @@ from utils.display import Display
 from utils.input import Video
 import argparse
 import os
+import cPickle as pickle
 
 cur_seek_pos = 0
 seek_callback_action = False
@@ -85,6 +86,7 @@ def main():
     # Get the first frame to start with
     frame = video.next_frame()
     
+    # To communicate with seek callback
     global seek_callback_action
 
     while True:
@@ -116,6 +118,22 @@ def main():
         # Refresh thresholded video display
         thresh_video_disp.refresh(frame_thresh)
 
+        # Add quitting event
+        if orig_video_disp.can_quit() or thresh_video_disp.can_quit():
+            break
+    
+    # On quit, save the thresholds
+    with open('new_thresholds.pickle', 'w') as f:
+        thresholds = {
+        'h_min': h_min,
+        'h_max': h_max,
+        's_min': s_min,
+        's_max': s_max,
+        'v_min': v_min,
+        'v_max': v_max
+        }
+        print 'Saved thresholds {} to {}'.format(thresholds, f.name)        
+        pickle.dump(thresholds, f)
 
 if __name__ == '__main__':
     main()
