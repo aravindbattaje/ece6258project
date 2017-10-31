@@ -13,4 +13,4 @@ __pycache__/
 captures/*
 
 # Temporary data
-new_*.pickle
+new_*.npz
