@@ -3,7 +3,8 @@ from utils.display import Display
 from utils.input import Video
 import argparse
 import os
-import cPickle as pickle
+from utils.config import LoadConfig
+from utils.config import SaveConfig
 
 cur_seek_pos = 0
 seek_callback_action = False
@@ -87,8 +88,8 @@ def main():
     args = get_args()
 
     # Read in configuration
-    with open('config/thresholds.pickle', 'r') as f:
-        thresholds = pickle.load(f)
+    load_config = LoadConfig('config/thresholds.npz', 'thresholds')
+    thresholds = load_config.load()
 
     # Setup video displays
     orig_video_disp = Display({'name': 'Original_Video'})
@@ -152,13 +153,8 @@ def main():
             break
 
     # On quit, save the params
-    with open('new_erode_dilate.pickle', 'w') as f:
-        params = {
-            'erode_size': erode_size,
-            'dilate_size': dilate_size,
-        }
-        print 'Saved {} to {}'.format(params, f.name)
-        pickle.dump(params, f)
+    save_config = SaveConfig('new_erode_dilate', 'erode_dilate')
+    save_config.save(dilate_size=dilate_size, erode_size=erode_size)
 
 
 if __name__ == '__main__':

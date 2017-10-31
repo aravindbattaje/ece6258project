@@ -3,7 +3,7 @@ from utils.display import Display
 from utils.input import Video
 import argparse
 import os
-import cPickle as pickle
+from utils.config import SaveConfig
 
 cur_seek_pos = 0
 seek_callback_action = False
@@ -125,17 +125,9 @@ def main():
             break
 
     # On quit, save the thresholds
-    with open('new_thresholds.pickle', 'w') as f:
-        thresholds = {
-            'h_min': h_min,
-            'h_max': h_max,
-            's_min': s_min,
-            's_max': s_max,
-            'v_min': v_min,
-            'v_max': v_max
-        }
-        print 'Saved thresholds {} to {}'.format(thresholds, f.name)
-        pickle.dump(thresholds, f)
+    save_config = SaveConfig('new_thresholds', 'thresholds')
+    save_config.save(h_min=h_min, h_max=h_max, s_min=s_min,
+                     s_max=s_max, v_min=v_min, v_max=v_max)
 
 
 if __name__ == '__main__':
