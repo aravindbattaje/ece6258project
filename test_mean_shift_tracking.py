@@ -5,11 +5,11 @@ import argparse
 import os
 import numpy as np
 
-kernel = np.ones((8,8),np.uint8) # kernel for Erosion and Dilation
 cur_seek_pos = 0
 seek_callback_action = False
 controls_window_name = 'Controls'
 play_or_pause = 'Pause'
+
 
 def dummy_callback(value):
     pass
@@ -28,6 +28,7 @@ def playpause_callback(value):
         play_or_pause = 'Pause'
     else:
         play_or_pause = 'Play'
+
 
 def setup_trackbars(window_name):
     window = cv2.namedWindow(window_name, 0)
@@ -75,9 +76,8 @@ def main():
 
     # Setup video displays
     orig_video_disp = Display({'name': 'Original_Video'})
-    thresh_video_disp = Display({'name': 'Tresholded_Video'})
+    thresh_video_disp = Display({'name': 'Thresholded_Video'})
     mean_shift_video_disp = Display({'name': 'Mean-Shift Tracking Video'})
-
 
     # Setup controls
     setup_trackbars(controls_window_name)
@@ -88,28 +88,26 @@ def main():
 
     # Get the first frame to start with
     frame = video.next_frame()
-    
+
     global seek_callback_action
 
-
-    
-
     # setup initial location of window
-    top,length,left,width = 450,36,1000,43  # simply hardcoded the values
-    track_window = (left,top,width,length)
+    top, length, left, width = 450, 36, 1000, 43  # simply hardcoded the values
+    track_window = (left, top, width, length)
 
     # set up the ROI for tracking
-    roi = frame[top:top+length, left:left+width]
-    hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    roi = frame[top:top + length, left:left + width]
+    hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     h_min, h_max, s_min, s_max, v_min, v_max = get_thresholds(
-            controls_window_name)
-    mask = cv2.inRange(hsv_roi, np.array((h_min, s_min,v_min)), np.array((h_max,s_max,v_max)))
-    roi_hist = cv2.calcHist([hsv_roi],[0],mask,[180],[0,180])
-    cv2.normalize(roi_hist,roi_hist,0,255,cv2.NORM_MINMAX)
-    
-    # Setup the termination criteria, either 10 iteration or move by atleast 1 pt
-    term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 1 )
-    
+        controls_window_name)
+    mask = cv2.inRange(hsv_roi, np.array(
+        (h_min, s_min, v_min)), np.array((h_max, s_max, v_max)))
+    roi_hist = cv2.calcHist([hsv_roi], [0], mask, [180], [0, 180])
+    cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
+
+    # Setup the termination criteria, either 10 iteration or move by at least 1 pt
+    term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 1)
+
     while True:
         if play_or_pause == 'Play':
             if not seek_callback_action:
@@ -136,26 +134,28 @@ def main():
 
         frame_thresh = cv2.inRange(
             frame_hsv, (h_min, s_min, v_min), (h_max, s_max, v_max))
-        
-
 
         # threshold image in hsv domain
-        frame_hsv_threshold = cv2.bitwise_and(frame_hsv,frame_hsv, mask= frame_thresh)
+        frame_hsv_threshold = cv2.bitwise_and(
+            frame_hsv, frame_hsv, mask=frame_thresh)
 
         # Refresh thresholded video display
         thresh_video_disp.refresh(frame_hsv_threshold)
-        
-        dst = cv2.calcBackProject([frame_hsv_threshold],[0],roi_hist,[0,180],1)
-        
+
+        # Find the backprojection of the histogram
+        dst = cv2.calcBackProject([frame_hsv_threshold], [
+                                  0], roi_hist, [0, 180], 1)
+
         # apply meanshift to get the new location
-        ret, track_window = cv2.meanShift(dst, track_window, term_crit)
+        ret, track_window = cv2.meanShift(dst, track_window, term_criteria)
 
         # Draw it on image
-        x,y,w,h = track_window
-        frame_mean_shift = cv2.rectangle(frame, (x,y), (x+w,y+h), 255,2)
+        x, y, w, h = track_window
+        frame_mean_shift = cv2.rectangle(frame, (x, y), (x + w, y + h), 255, 2)
 
         # Refresh mean shift tracking video display
         mean_shift_video_disp.refresh(frame_mean_shift)
-        
+
+
 if __name__ == '__main__':
     main()
