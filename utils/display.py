@@ -9,14 +9,16 @@ class Display(object):
     'name': 'frame',
     'width': 720,
     'height': 480,
-    'quit-key': 'q' 
+    'quit-key': 'q'
+    'additional-keys': ['s', 'b']
     """
     # Default configuration
     def_config = {
         'name': 'frame',
         'width': 720,
         'height': 480,
-        'quit-key': 'q'
+        'quit-key': 'q',
+        'additional-keys': ['s', 'b', 'n']
     }
 
     def __init__(self, config={}, verbose=False):
@@ -25,6 +27,10 @@ class Display(object):
         # specified by the user
         self.config = self.def_config.copy()
         self.config.update(config)
+
+        # Store flags for each additional key the
+        # display should listen to
+        self.add_keys_flags = [False] * len(self.config['additional-keys'])
 
         # Setup a named window with WINDOW_NORMAL attribute
         # This allows the windows to be resized to custom size
@@ -49,7 +55,25 @@ class Display(object):
         ret = cv2.waitKey(1) & 0xFF
         if ret is ord(self.config['quit-key']):
             self.quit_key_pressed = True
+        else:
+            for i, key in enumerate(self.config['additional-keys']):
+                if ret is ord(key):
+                    self.add_keys_flags[i] = True
 
     def can_quit(self):
         """Helper to determine if quit key is pressed."""
         return self.quit_key_pressed
+
+    def key_pressed(self, key):
+        """Checks if some given key is serviced.
+
+        If the key is serviced, the corresponding 
+        flag is made False."""
+        if key in self.config['additional-keys']:
+            ret = self.add_keys_flags[
+                self.config['additional-keys'].index(key)]
+            if ret is True:
+                self.add_keys_flags[
+                    self.config['additional-keys'].index(key)] = False
+
+        return ret

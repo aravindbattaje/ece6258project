@@ -54,6 +54,10 @@ class Video(object):
         """Getter for number of frames in video."""
         return self.num_frames
 
+    def get_cur_frame_num(self):
+        """Get current frame number."""
+        return int(self.cap.get(1))
+
     def get_frame(self, frame_num):
         """
         Get any random frame in the video. 
