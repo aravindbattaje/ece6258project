@@ -14,3 +14,7 @@ captures/*
 
 # Temporary data
 new_*.npz
+
+# Calibration images stored
+# as an intermediate step
+calib_images/*
