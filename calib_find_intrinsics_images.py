@@ -6,8 +6,8 @@ from utils.config import SaveConfig
 from calib_generate_charuco import dictionary, board
 import numpy as np
 
-MAX_ARUCO_IDS = 10
-MAX_CHARUCO_IDS = 12
+MAX_ARUCO_IDS = 40
+MAX_CHARUCO_IDS = 63
 
 
 def get_args():
@@ -63,6 +63,8 @@ def main():
         # the same dictionary we used to generate the board (imported)
         corners, ids, rejected_img_points = cv2.aruco.detectMarkers(
             img, dictionary)
+
+        corners, ids = cv2.aruco.refineDetectedMarkers(img, board, corners, ids, rejected_img_points)[:2]
 
         # If any markers in the dictionary are found, go ahead to
         # find the chessboard around the markers. Also, draw
@@ -123,6 +125,13 @@ def main():
         tvecs = [np.zeros((1, 1, 3), dtype=np.float64)
                  for i in range(len(charuco_corners_list))]
 
+        test_calib_matrix = np.array([
+            [680., 0., 960.],
+            [0, 680., 540.],
+            [0, 0, 1]
+        ])
+        test_calib_matrix_orig = np.copy(test_calib_matrix)
+
         # The quite important calibration flags
         #   CALIB_RECOMPUTE_EXTRINSIC forces extrinsic to be
         #   recalculated for each iteration of intrinsic optimization
@@ -133,7 +142,7 @@ def main():
         #   CALIB_CHECK_COND makes sure we didn't mess up with
         #   any of the inputs.
         calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW + \
-            cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT + cv2.fisheye.CALIB_CHECK_COND
+            cv2.fisheye.CALIB_FIX_PRINCIPAL_POINT + cv2.fisheye.CALIB_CHECK_COND 
 
         # Finally, the monster. We allow termination criteria
         # to be either max iterations of 100 or epsilon of 1e-6

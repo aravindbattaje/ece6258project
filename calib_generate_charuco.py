@@ -11,7 +11,7 @@ dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_250)
 # Num. squares in Y direction = 5
 # Chess board square length = 4 cm
 # Aruco marker square length = 2 cm
-board = cv2.aruco.CharucoBoard_create(4, 5, 0.04, 0.02, dictionary)
+board = cv2.aruco.CharucoBoard_create(8, 10, 0.02, 0.01, dictionary)
 
 def main():
     # Draw the board on a canvas of

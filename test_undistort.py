@@ -6,13 +6,10 @@ import os
 from utils.config import LoadConfig
 from utils.config import SaveConfig
 from calib_generate_charuco import dictionary, board
-from collections import deque
 import numpy as np
 
 play_or_pause = 'Pause'
 seek_callback_action = False
-MAX_ARUCO_IDS = 10
-MAX_CHARUCO_IDS = 12
 
 
 def seek_callback(value):
@@ -170,6 +167,8 @@ def main():
                 calib['camera_matrix'], calib['dist_coeffs'], np.eye(3), new_calib_matrix, new_img_size, cv2.CV_16SC2)
             img_undistorted = cv2.remap(
                 frame, map1, map2, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
+
+            cv2.imwrite('test_file.png', img_undistorted)
 
         # Update GUI with new image
         video_disp.refresh(img_undistorted)
