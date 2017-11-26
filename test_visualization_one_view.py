@@ -8,12 +8,62 @@ from utils.config import LoadConfig
 from utils.config import SaveConfig
 import numpy as np
 
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+from mpl_toolkits.mplot3d import Axes3D
+import mpl_toolkits.mplot3d.art3d as art3d
+
+from multiprocessing import Process, Array
+
 import mean_shift_tracking_frame
 import histogram_comparison
 
 PING_PONG_DIAMETER = 40  # mm
 FOCAL_LENGTH = 14  # mm
 
+main_process_end_reached = False
+
+def visualize_table(ball_wc):
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    p = Rectangle((-0.7625, -1.37), 1.525, 2.74, alpha=0.5)
+    ax.add_patch(p)
+    art3d.pathpatch_2d_to_3d(p, z=0, zdir="z")
+
+    ax.set_xlim(-3, 3)
+    ax.set_ylim(-3, 3)
+    ax.set_zlim(-1, 3)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$y$')
+    ax.set_zlabel('$z$')
+
+    sca = ax.scatter([0], [1.37], [0.5], color='r', s=50, alpha=0.25)
+
+    plt.draw()
+
+    prev_ball_wc = [0, 0, 0]
+
+    def compare_coordinates(one, two):
+        if one[0] == two[0] and one[1] == two[1] and one[2] == two[2]:
+            return True
+        return False
+
+    while not main_process_end_reached or plt.get_fignums():
+        if not compare_coordinates(ball_wc, prev_ball_wc):
+            prev_ball_wc[0] = ball_wc[0]
+            prev_ball_wc[1] = ball_wc[1]
+            prev_ball_wc[2] = ball_wc[2]
+            sca.set_offsets([[ball_wc[0]], [ball_wc[1]]])
+            sca.set_3d_properties([[ball_wc[2]]], zdir='z')
+            sca.set_alpha(1)
+            fig.canvas.draw_idle()
+            plt.pause(0.1)
+
+        sca.set_alpha(0.25)
+        fig.canvas.draw_idle()
+        plt.pause(0.05)
 
 def get_args():
     # Setup argument parser
@@ -62,6 +112,10 @@ def main():
     # Get the first frame; to see
     # if video framework works
     frame = video.next_frame()
+
+    shared_var = Array('d', [0, 0, 0])
+    visu = Process(target=visualize_table, args=(shared_var,))
+    visu.start()
 
     # Setup the undistortion stuff
 
@@ -216,12 +270,20 @@ def main():
             print 'Ball CC', ball_cc
             print 'Ball WC', ball_wc
 
+            shared_var[0] = ball_wc[0]
+            shared_var[1] = ball_wc[1]
+            shared_var[2] = ball_wc[2]
+
         # Update GUI with new image
         video_disp.refresh(img_undistorted)
 
         # Add quitting event
         if video_disp.can_quit():
             break
+
+    global main_process_end_reached
+    main_process_end_reached = True
+    visu.join()
 
 
 if __name__ == '__main__':
