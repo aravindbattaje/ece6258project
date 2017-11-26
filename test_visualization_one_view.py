@@ -13,7 +13,8 @@ from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d import Axes3D
 import mpl_toolkits.mplot3d.art3d as art3d
 
-from multiprocessing import Process, Array
+from multiprocessing import Array, Value
+from threading import Thread
 
 import mean_shift_tracking_frame
 import histogram_comparison
@@ -21,9 +22,7 @@ import histogram_comparison
 PING_PONG_DIAMETER = 40  # mm
 FOCAL_LENGTH = 14  # mm
 
-main_process_end_reached = False
-
-def visualize_table(ball_wc):
+def visualize_table(end_reached, ball_wc):
     plt.ion()
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -34,7 +33,7 @@ def visualize_table(ball_wc):
 
     ax.set_xlim(-3, 3)
     ax.set_ylim(-3, 3)
-    ax.set_zlim(-1, 3)
+    ax.set_zlim(-1, 2)
     ax.set_xlabel('$x$')
     ax.set_ylabel('$y$')
     ax.set_zlabel('$z$')
@@ -50,7 +49,7 @@ def visualize_table(ball_wc):
             return True
         return False
 
-    while not main_process_end_reached or plt.get_fignums():
+    while end_reached.value != 1 and plt.get_fignums() > 0:
         if not compare_coordinates(ball_wc, prev_ball_wc):
             prev_ball_wc[0] = ball_wc[0]
             prev_ball_wc[1] = ball_wc[1]
@@ -59,11 +58,12 @@ def visualize_table(ball_wc):
             sca.set_3d_properties([[ball_wc[2]]], zdir='z')
             sca.set_alpha(1)
             fig.canvas.draw_idle()
-            plt.pause(0.1)
+            plt.pause(0.033)
 
         sca.set_alpha(0.25)
         fig.canvas.draw_idle()
-        plt.pause(0.05)
+        plt.pause(0.0015)
+    plt.close('all')
 
 def get_args():
     # Setup argument parser
@@ -113,8 +113,16 @@ def main():
     # if video framework works
     frame = video.next_frame()
 
+    # Original code was to multiprocess, but
+    # found MACOSX doesn't like forking processes
+    # with GUIs. However, retaining Array from
+    # multiproc for future.
     shared_var = Array('d', [0, 0, 0])
-    visu = Process(target=visualize_table, args=(shared_var,))
+    end_reached = Value('b', False)
+    # visu = Process(target=visualize_table, args=(shared_var,))
+    # visu.start()
+    visu = Thread(target=visualize_table, args=(end_reached, shared_var))
+    visu.daemon = True
     visu.start()
 
     # Setup the undistortion stuff
@@ -281,8 +289,8 @@ def main():
         if video_disp.can_quit():
             break
 
-    global main_process_end_reached
-    main_process_end_reached = True
+    end_reached.value = True
+    
     visu.join()
 
 
