@@ -106,18 +106,18 @@ def main():
 
             # Harcoded image size as
             # this is a test script
-            img_size = (1080, 1920)
+            img_size = (1920, 1080)
 
             # First create scaled intrinsics because we will undistort
             # into region beyond original image region
             new_calib_matrix, _ = cv2.getOptimalNewCameraMatrix(
-                calib['camera_matrix'], calib['dist_coeffs'], img_size, 1)
+                calib['camera_matrix'], calib['dist_coeffs'], img_size, 0.35)
 
             # Then calculate new image size according to the scaling
             # Unfortunately the Python API doesn't directly provide the
             # the new image size. They forgot?
-            new_img_size = (int(img_size[0] + (new_calib_matrix[1, 2] - calib['camera_matrix'][1, 2])), int(
-                img_size[1] + (new_calib_matrix[0, 2] - calib['camera_matrix'][0, 2])))
+            new_img_size = (int(img_size[0] + (new_calib_matrix[0, 2] - calib['camera_matrix'][0, 2])), int(
+                img_size[1] + (new_calib_matrix[1, 2] - calib['camera_matrix'][1, 2])))
 
             # Standard routine of creating a new rectification
             # map for the given intrinsics and mapping each
@@ -168,10 +168,20 @@ def main():
             img_undistorted = cv2.remap(
                 frame, map1, map2, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
 
-            cv2.imwrite('test_file.png', img_undistorted)
-
         # Update GUI with new image
         video_disp.refresh(img_undistorted)
+
+        # Service the s key to save image
+        if video_disp.key_pressed('s'):
+            cur_frame_num = video.get_cur_frame_num()
+            orig_img_file_name = 'image_for_markers_orig.png'
+            undistorted_img_file_name = 'image_for_markers_undistorted.png'
+            if cv2.imwrite(orig_img_file_name, frame):
+                print 'Saved original {} at frame {}'.format(
+                    orig_img_file_name, cur_frame_num)
+            if cv2.imwrite(undistorted_img_file_name, img_undistorted):
+                print 'Saved undistorted {} at frame {}'.format(
+                    undistorted_img_file_name, cur_frame_num)
 
         # Add quitting event
         if video_disp.can_quit():

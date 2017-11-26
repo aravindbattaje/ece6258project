@@ -6,6 +6,10 @@ from utils.config import SaveConfig
 from calib_generate_charuco import dictionary, board
 import numpy as np
 
+# Dependent on number of markers
+# in the dictionary. Make this
+# programmatic later than just
+# hardcoding it.
 MAX_ARUCO_IDS = 40
 MAX_CHARUCO_IDS = 63
 
@@ -64,7 +68,10 @@ def main():
         corners, ids, rejected_img_points = cv2.aruco.detectMarkers(
             img, dictionary)
 
-        corners, ids = cv2.aruco.refineDetectedMarkers(img, board, corners, ids, rejected_img_points)[:2]
+        # Refine the detected markers to find the missing
+        # IDs. Required when we have boards with lots of IDs.
+        corners, ids = cv2.aruco.refineDetectedMarkers(
+            img, board, corners, ids, rejected_img_points)[:2]
 
         # If any markers in the dictionary are found, go ahead to
         # find the chessboard around the markers. Also, draw

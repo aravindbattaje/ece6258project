@@ -23,21 +23,23 @@ MARKER_B_MAX_THRESH = 255
 # positions are the vertices of  the quarter
 # on the table which is opposite to the
 # camera view.
-# +++++++++++++++++++-------------------
+# 2+++++++++++++++++4-------------------
 # +                 +                   |
 # +                 +                   |
-# +++++++++++++++++++-------------------
+# 1+++++++++++++++++3-------------------
 # |                 |                   |
 # |                 |                   |
 # --------------------C------------------
+#   1, 2, 3, 4 marker points in order
+#               3 is origin
 #           C is current camera
 #    + is the area marked for extrinsic
 # The coordinates are all in meters.
 TABLE_MARKERS = np.array([
-    [0, 0, 0],
     [0, 1.37, 0],
-    [0.7625, 0, 0],
-    [0.7625, 1.37, 0]
+    [0.7625, 1.37, 0],
+    [0, 0, 0],
+    [0.7625, 0, 0]
 ])
 
 # Coordinates of origin
@@ -58,6 +60,10 @@ def get_args():
 
     arg_parser.add_argument(
         '-i', '--image', required=True, help='Input marked image file')
+
+    arg_parser.add_argument(
+        '-d', '--distorted', action='store_true', help='Distorted or undistorted image'
+    )
 
     arg_parser.add_argument(
         '-m', '--model', required=True, help='Camera model - Pinhole (P)/Fisheye (F)'
@@ -105,6 +111,10 @@ def main():
         # Make 'circles' easy to index
         circles = circles[0, :]
 
+        # Arrange circles X-coordinates - left to right
+        # to match the TABLE markers scheme
+        circles = circles[circles[:, 0].argsort()]
+
         # Check if we have exactly 4 markers
         if circles.shape[0] != 4:
             print 'Number of markers not 4'
@@ -123,12 +133,36 @@ def main():
 
     # Find scaled intrinsics according to pinhole model
     if args['model'].upper() == 'P':
-        # TODO: Complete this part out although its not required currently
-        print 'Extrinsic calibration via pinhole model currently not supported.'
-        return
+        # Make sure distortion coeffecients
+        # follow pinhole model
+        if calib['dist_coeffs'].shape[1] != 5:
+            print 'Input configuration probably not pinhole'
+            return
+
+        if not args['distorted']:
+            # NOTE: Harcoded image size
+            img_size = (1920, 1080)
+
+            # First create scaled intrinsics because we will undistort
+            # into region beyond original image region
+            new_calib_matrix = cv2.getOptimalNewCameraMatrix(
+                calib['camera_matrix'], calib['dist_coeffs'], img_size, 0.35)[0]
+
+            # If we have undistorted image, we don't
+            # need to use distortion model for projection
+            new_dist_coeffs = np.zeros((5, 1))
+        else:
+            new_calib_matrix = calib['camera_matrix']
+            new_dist_coeffs = calib['dist_coeffs']
 
     # Find scaled intrinsics according to fisheye model
     elif args['model'].upper() == 'F':
+        # If distorted image supplied,
+        # no support currently.
+        if args['distorted']:
+            print 'Please supply undistored image for fisheye model'
+            return
+
         # Make sure distortion coeffecients
         # follow fisheye model
         if calib['dist_coeffs'].shape[0] != 4:
@@ -145,6 +179,10 @@ def main():
         new_calib_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
             calib['camera_matrix'], calib['dist_coeffs'], img_size, np.eye(3), balance=1)
 
+        # If we have undistorted image, we don't
+        # need to use distortion model for projection
+        new_dist_coeffs = np.zeros((5, 1))
+
     # Solve a point to point correspondence with
     # ideal points in the 3D world with projections
     # as we obtained from the user.
@@ -155,14 +193,19 @@ def main():
     # some old style pointers.
     obj_points = np.ascontiguousarray(TABLE_MARKERS.reshape((-1, 1, 3)))
     img_points = np.ascontiguousarray(circles[:, :2].reshape((-1, 1, 2)))
+
+    # RANSAC achieves better performance than DLT + LM
+    # as the markers in the TABLE might be noisy
+    # rvecs, tvecs = cv2.solvePnP(
+    #     obj_points, img_points, calib['camera_matrix'], calib['dist_coeffs'])[1:]
     rvecs, tvecs = cv2.solvePnPRansac(
-        obj_points, img_points, new_calib_matrix, np.zeros((5, 1)))[1:3]
+        obj_points, img_points, new_calib_matrix, new_dist_coeffs)[1:3]
 
     # Project the origin of the table back
     # on to imager according to the found
     # extrinsics rotation and translation
     projected_points = cv2.projectPoints(
-        AXIS_AT_ORIGIN, rvecs, tvecs, new_calib_matrix, np.zeros((5, 1)))[0]
+        AXIS_AT_ORIGIN, rvecs, tvecs, new_calib_matrix, new_dist_coeffs)[0]
 
     # Draw the axes at the origin on to image
     img = cv2.line(img, tuple(projected_points[0].ravel().astype(int)), tuple(
