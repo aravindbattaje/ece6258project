@@ -13,8 +13,7 @@ from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d import Axes3D
 import mpl_toolkits.mplot3d.art3d as art3d
 
-from multiprocessing import Array, Value
-from threading import Thread
+from multiprocessing import Process, Array
 
 import mean_shift_tracking_frame
 import histogram_comparison
@@ -22,7 +21,9 @@ import histogram_comparison
 PING_PONG_DIAMETER = 40  # mm
 FOCAL_LENGTH = 14  # mm
 
-def visualize_table(end_reached, ball_wc):
+main_process_end_reached = False
+
+def visualize_table(ball_wc):
     plt.ion()
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -33,7 +34,7 @@ def visualize_table(end_reached, ball_wc):
 
     ax.set_xlim(-3, 3)
     ax.set_ylim(-3, 3)
-    ax.set_zlim(-1, 2)
+    ax.set_zlim(-1, 3)
     ax.set_xlabel('$x$')
     ax.set_ylabel('$y$')
     ax.set_zlabel('$z$')
@@ -49,7 +50,7 @@ def visualize_table(end_reached, ball_wc):
             return True
         return False
 
-    while end_reached.value != 1 and plt.get_fignums() > 0:
+    while not main_process_end_reached or plt.get_fignums():
         if not compare_coordinates(ball_wc, prev_ball_wc):
             prev_ball_wc[0] = ball_wc[0]
             prev_ball_wc[1] = ball_wc[1]
@@ -58,12 +59,11 @@ def visualize_table(end_reached, ball_wc):
             sca.set_3d_properties([[ball_wc[2]]], zdir='z')
             sca.set_alpha(1)
             fig.canvas.draw_idle()
-            plt.pause(0.033)
+            plt.pause(0.1)
 
         sca.set_alpha(0.25)
         fig.canvas.draw_idle()
-        plt.pause(0.0015)
-    plt.close('all')
+        plt.pause(0.05)
 
 def get_args():
     # Setup argument parser
@@ -99,7 +99,7 @@ def main():
     calib = load_config.load()
 
     # Read in extrinsic calibration
-    load_config_e = LoadConfig('new_extrinsics.npz', 'extrinsics')
+    load_config_e = LoadConfig('config/extrinsic_calib_p_camera_1.npz', 'extrinsics')
     extrinsics = load_config_e.load()
 
     # Setup video display
@@ -113,16 +113,8 @@ def main():
     # if video framework works
     frame = video.next_frame()
 
-    # Original code was to multiprocess, but
-    # found MACOSX doesn't like forking processes
-    # with GUIs. However, retaining Array from
-    # multiproc for future.
     shared_var = Array('d', [0, 0, 0])
-    end_reached = Value('b', False)
-    # visu = Process(target=visualize_table, args=(shared_var,))
-    # visu.start()
-    visu = Thread(target=visualize_table, args=(end_reached, shared_var))
-    visu.daemon = True
+    visu = Process(target=visualize_table, args=(shared_var,))
     visu.start()
 
     # Setup the undistortion stuff
@@ -172,7 +164,7 @@ def main():
             calib['camera_matrix'], calib['dist_coeffs'], np.eye(3), new_calib_matrix, new_img_size, cv2.CV_16SC2)
 
     # STUFF
-    corr_threshold = 0.20
+    corr_threshold = -1
     radius_change_threshold = 5
     ball_image_file = 'ball_image.jpg'
     # will be used for histogram comparison
@@ -180,7 +172,7 @@ def main():
 
     fgbg2 = cv2.createBackgroundSubtractorMOG2()
 
-    kernel = np.ones((3, 3), np.uint8)
+    kernel = np.ones((6, 6), np.uint8)
     ball_position_frame2 = None
     prev_frame2 = None
 
@@ -196,7 +188,7 @@ def main():
         # STUFF
         img_hsv = cv2.cvtColor(img_undistorted, cv2.COLOR_BGR2HSV)
         mask2 = cv2.inRange(img_hsv, np.array(
-            (10, 150, 200)), np.array((30, 255, 255)))
+            (15, 190, 200)), np.array((25, 255, 255)))
         fgmask2 = fgbg2.apply(img_undistorted)
         mask2_color_bgs = cv2.bitwise_and(mask2, mask2, mask=fgmask2)
         frame2_hsv_bgs = cv2.bitwise_and(
@@ -211,49 +203,51 @@ def main():
             frame_gray, frame_gray, mask=open_mask)
         frame_thresholded_opened_gray_smoothed = cv2.GaussianBlur(
             frame_thresholded_opened_gray, (11, 11), 0)
-        # one more opening
+        # opening
         a = cv2.inRange(frame_thresholded_opened_gray_smoothed, 10, 256)
-        b = cv2.morphologyEx(a, cv2.MORPH_OPEN, kernel)
-        circles = cv2.HoughCircles(b, cv2.HOUGH_GRADIENT, dp=1.5,
-                                   minDist=2500, param1=150, param2=15, minRadius=5, maxRadius=35)
+        b = cv2.morphologyEx(mask2_color_bgs, cv2.MORPH_OPEN, kernel)
+        circles = cv2.HoughCircles(b, cv2.HOUGH_GRADIENT, dp=3,
+                                   minDist=2500, param1=300, param2=5, minRadius=3, maxRadius=30)
         if circles is not None:
             # convert the (x, y) coordinates and radius of the circles to integers
             circles = np.round(circles[0, :]).astype("int")
             x, y, r = circles[0]
-            ball_position_frame2_new = [x - r, y - r, 2 * r, 2 * r]
+            ball_position_frame2 = [x - r, y - r, 2 * r, 2 * r]
             # loop over the (x, y) coordinates and radius of the circles
         else:
-            ball_position_frame2_new = None
+            ball_position_frame2 = None
 
         frame2 = img_undistorted
-        if ball_position_frame2_new == None and ball_position_frame2 != None:
-            ball_position_frame2_new = mean_shift_tracking_frame.mean_shift_tracking_frame(
-                ball_position_frame2, frame2, prev_frame2)
 
-        if ball_position_frame2_new != None:
-            # check if matches correctly by comparing histogram
-            # if not match, not consider the current point as a ball
-            hist_corr2 = histogram_comparison.histogram_comparison(
-                ball_image, frame2, ball_position_frame2_new)
-            if hist_corr2 < corr_threshold:
-                ball_position_frame2_new = None
+        mask2_ball_radius = cv2.bitwise_and(fgmask2, fgmask2, mask=cv2.inRange(img_hsv, np.array((10, 150, 180)), np.array((40, 255, 255))))
+        if ball_position_frame2!=None:
+            x2,y2,w2,h2 = ball_position_frame2
+            ball_crop_temp = mask2_ball_radius[(y2+h2/2-30):(y2+h2/2+30),(x2+w2/2-30):(x2+w2/2+30)]
+            ball_crop_color = frame2[(y2+h2/2-30):(y2+h2/2+30),(x2+w2/2-30):(x2+w2/2+30)]
+            height, width = ball_crop_temp.shape
+        else:
+            ball_crop_temp = []
+            height = 0
+            width = 0
+            
 
-        # check if radius changes by more than the threshold between frames
-        if ball_position_frame2_new != None and ball_position_frame2 != None:
-            x2_new, y2_new, w2_new, h2_new = ball_position_frame2_new
-            x2, y2, w2, h2 = ball_position_frame2
-            if (w2_new + h2_new) / 2.0 - (w2 + h2) / 2.0 > radius_change_threshold:
-                ball_position_frame2 = [
-                    x2_new, y2_new, w2_new + radius_change_threshold, h2_new + radius_change_threshold]
-            elif (w2_new + h2_new) / 2.0 - (w2 + h2) / 2.0 < -radius_change_threshold:
-                ball_position_frame2 = [
-                    x2_new, y2_new, w2_new - radius_change_threshold, h2_new - radius_change_threshold]
-            else:
-                ball_position_frame2 = ball_position_frame2_new
-        elif ball_position_frame2_new != None:
-            ball_position_frame2 = ball_position_frame2_new
-        elif ball_position_frame2_new == None:
-            ball_position_frame2 = None
+        if height != 0 and width != 0:
+            ball_crop = ball_crop_temp
+
+
+
+        cnts = cv2.findContours(ball_crop.copy(), cv2.RETR_EXTERNAL,
+		cv2.CHAIN_APPROX_SIMPLE)[-2]
+	center = None
+
+	if len(cnts) > 0 and ball_position_frame2:
+            c = max(cnts, key=cv2.contourArea)
+            rect = cv2.minAreaRect(c)
+            width,height = rect[1]
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            cv2.drawContours(ball_crop_color,[box],0,(0,0,255),2)
+            ball_position_frame2 = [ball_position_frame2[0],ball_position_frame2[1],min(width,height),min(width,height)]
 
         prev_frame2 = frame2
 
@@ -283,14 +277,21 @@ def main():
             shared_var[2] = ball_wc[2]
 
         # Update GUI with new image
-        video_disp.refresh(img_undistorted)
+
+
+
+
+        
+        video_disp.refresh(frame2)
+
+        #print "Pixels", ball_position_frame2
 
         # Add quitting event
         if video_disp.can_quit():
             break
 
-    end_reached.value = True
-    
+    global main_process_end_reached
+    main_process_end_reached = True
     visu.join()
 
 
