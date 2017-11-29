@@ -18,3 +18,8 @@ new_*.npz
 # Calibration images stored
 # as an intermediate step
 calib_images/*
+
+# Ignore 2 images of calibration
+# images for documentation
+!calib_images/two_1_gopr0010_6281.png
+!calib_images/two_1_gopr0010_6281_markers.png
