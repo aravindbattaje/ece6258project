@@ -4,7 +4,7 @@ from __future__ import division
 # Standard libs
 import argparse
 import os
-import time
+import sys
 
 # Parallel processing
 import multiprocessing
@@ -86,10 +86,6 @@ def main_worker(id, video_file, camera_model, K, D, R, T, measurements, quit_eve
         # pixel onto the new map with linear interpolation
         map1, map2 = cv2.fisheye.initUndistortRectifyMap(
             K, D, np.eye(3), new_K, new_img_size_1, cv2.CV_16SC2)
-
-    # Load standard ball image that will be used for histogram comparison
-    ball_image_file = 'ball_image.jpg'
-    ball_image = cv2.imread(ball_image_file)
 
     # Set up foreground and background separation
     fgbg = cv2.createBackgroundSubtractorMOG2()
@@ -190,11 +186,12 @@ def main_worker(id, video_file, camera_model, K, D, R, T, measurements, quit_eve
 
         # Add quitting event
         if video_disp.can_quit():
-            # Setting this will signal
-            # the other parallel process
-            # to exit too.
-            quit_event.value = 1
             break
+    
+    # Setting this will signal
+    # the other parallel process
+    # to exit too.
+    quit_event.value = 1
 
 
 def update_visu(measurements_camera_1, measurements_camera_2, visu, quit_event):
@@ -301,9 +298,12 @@ def update_visu(measurements_camera_1, measurements_camera_2, visu, quit_event):
         # Update ball in visu
         visu.set(x=visu_x, y=visu_y, z=visu_z, scalars=visu_scalars)
 
-    # If thread wants to exit, take down
-    # visu window with it.
-    mlab.close(all=True)
+    # If thread wants to exit, should ideally
+    # take down visu window with it. But there
+    # seems to be some problem with the close
+    # function in mayavi. Ask user to manually 
+    # close that window
+    print 'Please close the visualization window too if not done already'
 
 
 # Argument parser
