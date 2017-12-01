@@ -100,7 +100,7 @@ If satisified with the calibration, copy over the newly generated calibration co
 
 The intrinsic calibration will be written to the file `new_calib.npz` in the root directory.
 
-## Test scripts
+### Test scripts
 
 There are several _test_ scripts in the repository that were constructed during development, and they usually encapsulate individual features. Some of the _test_ scripts maybe run to test out these individual features if desired. However, these scripts serve more as a template if further development in an individual feature is desired. The usage instructions for these scripts can be obtained by running
 
@@ -112,7 +112,7 @@ There are several _test_ scripts in the repository that were constructed during 
 
 This script reads the intrinsic calibration `new_calib_<camera_model>.npz` and displays undistorted version of the video file. If there was a _good_ calibration, straight lines in the world, for example edges of walls or ping pong table, that were distorted due to the imager optics must appear straight again in the undistorted video. The keyboard shortcut `s` saves the current video frame being viewed to two image files: Original video frame (distorted image) to `image_for_markers_orig.png` and Undistorted image to `image_for_markers_undistorted.png`.
 
-## Find extrinsic parameters of camera
+### Find extrinsic parameters of camera
 
 After performing intrinsic calibration for each of the camera successfully, the pose of each camera with respect to the ping pong table needs to be found. Currently, only a manually intervened process for finding camera position is supported, although extending the software to do it automatically will not be too difficult.
 
@@ -135,7 +135,7 @@ The output will be the given image with the center of table (X-Y-Z axis at world
 
 This script produces a file (`new_extrinsics.npz`) with the found calibration parameters. If satisified with the calibration, copy over the newly generated calibration configuration to `config` folder as `extrinsic_calib_<camera_model>_camera_<1/2>.npz`.
 
-## Ping pong tracker
+### Ping pong tracker
 
 Given successful intrinsic and extrinsic calibration, ping pong tracker locates the ball if seen in the scene in 3D space and represents that on an interactive visualization. Note that this script uses multiple processes and so it would be advantageous to run this on a multi-core PC. The usage for this script is
 
@@ -152,9 +152,15 @@ Note that depending on the system, VTK (the underlying visualization engine) mig
 
 Such warnings can be completely ignored and feel free to close `vtkOutputWindow` too.
 
-## Utils
+Fall back: If visualization is not working with Mayavi for some reason, an alternative would be to use `test_visualization_two_view.py` that uses Matplotlib for visualization in 3D space. However, because of the limitations in using Matplotlib for fast animation, and that the script is not optimized for multicore processing, this script is **not** preferred.
+
+### Utils
 
 During development some light wrapper utilities were written to aid in helping to use some OpenCV functions or saving/loading configuration files. They are present in the `utils` directory. These can be reused if anyone desires.
+
+## Video data
+
+Links to download some of the video files recorded with **Hero5 Black** is available in `captures` folder.
 
 ## Known bugs
 
