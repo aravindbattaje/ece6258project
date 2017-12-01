@@ -12,6 +12,10 @@ __pycache__/
 # Video data
 captures/*
 
+# Ignore README inside folder
+# for video data
+!captures/README.md
+
 # Temporary data
 new_*.npz
 
