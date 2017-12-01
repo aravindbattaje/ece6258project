@@ -25,6 +25,7 @@ from utils.config import LoadConfig
 
 # Custom
 import mean_shift_tracking_frame
+from histogram_comparison import histogram_comparison
 
 PING_PONG_DIAMETER = 40  # mm
 DEFAULT_FOCAL_LENGTH = 14  # mm
@@ -93,11 +94,17 @@ def main_worker(id, video_file, camera_model, K, D, R, T, measurements, quit_eve
     # Averaging kernel that will be used in opening
     kernel = np.ones((6, 6), np.uint8)
 
+    # Code commented out because not using
+    # confidence currently, but could be 
+    # used again with changes later
+    # # Will be used for histogram comparison
+    # # (Confidence measure)
+    # ball_image_file = 'ball_image.jpg'
+    # ball_image = cv2.imread(ball_image_file)
+
+
     # 2D ball detection and 3D ball tracking setup
     ball_position_frame = None
-    measurements_frame = np.asarray([[0, 0, 0]])
-    measurements_frame = np.ma.asarray(measurements_frame)
-    measurements_frame[0] = np.ma.masked
     ball_wc = [0, 0, 0]
 
     while not video.end_reached() and not quit_event.value:
@@ -142,7 +149,7 @@ def main_worker(id, video_file, camera_model, K, D, R, T, measurements, quit_eve
         if ball_position_frame:
             x1, y1, w1, h1 = ball_position_frame
             ball_crop_temp = mask_ball_radius[(
-                y1 + h1 // 2 - 30):(y1 + h1 // 2 + 30), (x1 + w1 // 2 - 30):(x1 + w1 // 2 + 30)]
+                y1 + h1 // 2 - 50):(y1 + h1 // 2 + 50), (x1 + w1 // 2 - 50):(x1 + w1 // 2 + 50)]   
             height, width = ball_crop_temp.shape
             if height and width:
                 # Successfully cropped image
@@ -153,10 +160,17 @@ def main_worker(id, video_file, camera_model, K, D, R, T, measurements, quit_eve
                 if len(cnts) > 0:
                     # contour detected
                     c = max(cnts, key=cv2.contourArea)
-                    rect = cv2.minAreaRect(c)
-                    width, height = rect[1]
-                    ball_position_frame = [ball_position_frame[0], ball_position_frame[1], min(
-                        width, height), min(width, height)]
+                    ellipse = cv2.fitEllipse(c)
+                    width = min(ellipse[1])
+                    ball_position_frame = [
+                        ball_position_frame[0], ball_position_frame[1], 2 * width, 2 * width]
+
+                # Code commented out because not using
+                # confidence currently, but could be 
+                # used again with changes later
+                # # Calculate confidence
+                # confidence = histogram_comparison(ball_image, img_undistorted, ball_position_frame)
+                # print confidence
 
         if ball_position_frame:
             x1, y1, w1, h1 = ball_position_frame
@@ -187,7 +201,7 @@ def main_worker(id, video_file, camera_model, K, D, R, T, measurements, quit_eve
         # Add quitting event
         if video_disp.can_quit():
             break
-    
+
     # Setting this will signal
     # the other parallel process
     # to exit too.
@@ -301,7 +315,7 @@ def update_visu(measurements_camera_1, measurements_camera_2, visu, quit_event):
     # If thread wants to exit, should ideally
     # take down visu window with it. But there
     # seems to be some problem with the close
-    # function in mayavi. Ask user to manually 
+    # function in mayavi. Ask user to manually
     # close that window
     print 'Please close the visualization window too if not done already'
 
